@@ -1,0 +1,18 @@
+﻿services:
+  - type: web
+    name: cufpi-price-tool-api
+    env: docker
+    repo: https://github.com/craigwillingham-blip/cufpi-price-data-tool
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cufpi-price-db
+          property: connectionString
+      - key: TESSERACT_PATH
+        value: tesseract
+
+databases:
+  - name: cufpi-price-db
+    plan: free

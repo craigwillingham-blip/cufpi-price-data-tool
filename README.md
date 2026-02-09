@@ -19,3 +19,21 @@ Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/ingestion/circulars/r
 ```
 
 If you want OCR on a file via the API, use `POST /ocr/run` first, then send the extracted text to `/ingestion/circulars/run`.
+
+## Deploy backend on Render (for GitHub Pages)
+
+1. Create a free account at Render and connect your GitHub account.
+2. In Render, select **New > Blueprint**.
+3. Choose this repo: `cufpi-price-data-tool`.
+4. Render will detect `render.yaml` and create:
+   - `cufpi-price-tool-api` (web service)
+   - `cufpi-price-db` (Postgres)
+5. Deploy. After it finishes, copy the service URL (it will look like `https://something.onrender.com`).
+
+## Point GitHub Pages to the backend
+
+Open the GitHub Pages UI and set the API in the **Backend Connection** box, or add `?api=YOUR_URL` to the URL, for example:
+
+```
+https://craigwillingham-blip.github.io/cufpi-price-data-tool/?api=https://YOUR-RENDER-URL
+```

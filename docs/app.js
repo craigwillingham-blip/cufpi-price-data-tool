@@ -4,6 +4,12 @@ const DEFAULT_API = "http://127.0.0.1:8000";
 
 function useApiBase() {
   const [apiBase, setApiBase] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get("api");
+    if (fromQuery) {
+      localStorage.setItem("apiBase", fromQuery);
+      return fromQuery;
+    }
     return localStorage.getItem("apiBase") || DEFAULT_API;
   });
 
