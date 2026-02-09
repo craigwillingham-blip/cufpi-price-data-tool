@@ -1,6 +1,19 @@
 ﻿const { useState, useEffect } = React;
 
-const API_BASE = "http://127.0.0.1:8000";
+const DEFAULT_API = "http://127.0.0.1:8000";
+
+function useApiBase() {
+  const [apiBase, setApiBase] = useState(() => {
+    return localStorage.getItem("apiBase") || DEFAULT_API;
+  });
+
+  const update = (next) => {
+    localStorage.setItem("apiBase", next);
+    setApiBase(next);
+  };
+
+  return [apiBase, update];
+}
 
 function TopBar({ route, setRoute }) {
   const items = [
@@ -73,7 +86,7 @@ function Home({ setRoute }) {
   );
 }
 
-function Compare() {
+function Compare({ apiBase }) {
   const [query, setQuery] = useState("");
   const [products, setProducts] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -81,7 +94,7 @@ function Compare() {
 
   const runSearch = async () => {
     if (!query) return;
-    const res = await fetch(`${API_BASE}/products?query=${encodeURIComponent(query)}`);
+    const res = await fetch(`${apiBase}/products?query=${encodeURIComponent(query)}`);
     const data = await res.json();
     setProducts(data);
     setSelected(null);
@@ -89,7 +102,7 @@ function Compare() {
   };
 
   const loadPrices = async (productId) => {
-    const res = await fetch(`${API_BASE}/products/${productId}/prices`);
+    const res = await fetch(`${apiBase}/products/${productId}/prices`);
     const data = await res.json();
     setPrices(data.prices || []);
   };
@@ -148,7 +161,7 @@ function Compare() {
   );
 }
 
-function ReceiptUpload() {
+function ReceiptUpload({ apiBase }) {
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState("");
 
@@ -156,7 +169,7 @@ function ReceiptUpload() {
     if (!file) return;
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch(`${API_BASE}/receipts/upload`, { method: "POST", body: form });
+    const res = await fetch(`${apiBase}/receipts/upload`, { method: "POST", body: form });
     const data = await res.json();
     setStatus(`Uploaded receipt #${data.receipt_id}`);
   };
@@ -175,7 +188,7 @@ function ReceiptUpload() {
   );
 }
 
-function IngestCircular() {
+function IngestCircular({ apiBase }) {
   const [stores, setStores] = useState([]);
   const [storeId, setStoreId] = useState("");
   const [tab, setTab] = useState("upload");
@@ -186,15 +199,15 @@ function IngestCircular() {
   const [status, setStatus] = useState("");
 
   useEffect(() => {
-    fetch(`${API_BASE}/stores`).then(r => r.json()).then(setStores);
-  }, []);
+    fetch(`${apiBase}/stores`).then(r => r.json()).then(setStores);
+  }, [apiBase]);
 
   const runOcr = async () => {
     if (!file || !storeId) return;
     setStatus("Processing...");
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch(`${API_BASE}/ocr/run`, { method: "POST", body: form });
+    const res = await fetch(`${apiBase}/ocr/run`, { method: "POST", body: form });
     const data = await res.json();
     setItems(data.items || []);
     setOcrText(data.text || "");
@@ -208,7 +221,7 @@ function IngestCircular() {
       source_url: file ? `upload:${file.name}` : "upload",
       text: ocrText
     };
-    const res = await fetch(`${API_BASE}/ingestion/circulars/run`, {
+    const res = await fetch(`${apiBase}/ingestion/circulars/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -221,7 +234,7 @@ function IngestCircular() {
     if (!url || !storeId) return;
     setStatus("Fetching...");
     const payload = { store_id: Number(storeId), source_url: url };
-    const res = await fetch(`${API_BASE}/ingestion/circulars/from-url`, {
+    const res = await fetch(`${apiBase}/ingestion/circulars/from-url`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -281,7 +294,7 @@ function IngestCircular() {
   );
 }
 
-function Contribute() {
+function Contribute({ apiBase }) {
   const [stores, setStores] = useState([]);
   const [storeId, setStoreId] = useState("");
   const [product, setProduct] = useState("");
@@ -289,12 +302,12 @@ function Contribute() {
   const [status, setStatus] = useState("");
 
   useEffect(() => {
-    fetch(`${API_BASE}/stores`).then(r => r.json()).then(setStores);
-  }, []);
+    fetch(`${apiBase}/stores`).then(r => r.json()).then(setStores);
+  }, [apiBase]);
 
   const submit = async () => {
     const body = { store_id: Number(storeId), product_name: product, price: Number(price) };
-    const res = await fetch(`${API_BASE}/crowd/submit`, {
+    const res = await fetch(`${apiBase}/crowd/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
@@ -322,19 +335,19 @@ function Contribute() {
   );
 }
 
-function Sources() {
+function Sources({ apiBase }) {
   const [sources, setSources] = useState([]);
   const [status, setStatus] = useState("");
 
   const load = () => {
-    fetch(`${API_BASE}/sources`).then(r => r.json()).then(data => setSources(data.sources || []));
+    fetch(`${apiBase}/sources`).then(r => r.json()).then(data => setSources(data.sources || []));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [apiBase]);
 
   const save = async () => {
     const payload = { sources };
-    await fetch(`${API_BASE}/sources`, {
+    await fetch(`${apiBase}/sources`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -381,20 +394,48 @@ function Sources() {
 
 function App() {
   const [route, setRoute] = useState("home");
+  const [apiBase, setApiBase] = useApiBase();
+  const [apiStatus, setApiStatus] = useState("");
+
+  useEffect(() => {
+    const test = async () => {
+      try {
+        const res = await fetch(`${apiBase}/`);
+        const data = await res.json();
+        setApiStatus(data.status === "ok" ? "connected" : "error");
+      } catch (e) {
+        setApiStatus("error");
+      }
+    };
+    test();
+  }, [apiBase]);
 
   let page = <Home setRoute={setRoute} />;
-  if (route === "compare") page = <Compare />;
-  if (route === "ingest") page = <IngestCircular />;
-  if (route === "receipt") page = <ReceiptUpload />;
-  if (route === "contribute") page = <Contribute />;
-  if (route === "sources") page = <Sources />;
+  if (route === "compare") page = <Compare apiBase={apiBase} />;
+  if (route === "ingest") page = <IngestCircular apiBase={apiBase} />;
+  if (route === "receipt") page = <ReceiptUpload apiBase={apiBase} />;
+  if (route === "contribute") page = <Contribute apiBase={apiBase} />;
+  if (route === "sources") page = <Sources apiBase={apiBase} />;
 
   return (
     <div className="app">
       <TopBar route={route} setRoute={setRoute} />
+      <div className="card" style={{ marginTop: 16 }}>
+        <h3>Backend Connection</h3>
+        <div className="small">
+          Current API: {apiBase} ({apiStatus})
+        </div>
+        <div className="filters" style={{ marginTop: 8 }}>
+          <input value={apiBase} onChange={(e) => setApiBase(e.target.value)} />
+        </div>
+        <div className="small" style={{ marginTop: 6 }}>
+          If you are on GitHub Pages, the backend must be publicly hosted and use https.
+          For local testing, open the local file instead of GitHub Pages.
+        </div>
+      </div>
       {page}
       <div className="footer-note">
-        Demo UI. API expected at {API_BASE}.
+        Demo UI. API expected at {apiBase}.
       </div>
     </div>
   );
