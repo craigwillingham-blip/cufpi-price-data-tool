@@ -33,6 +33,15 @@ function TopBar({ route, setRoute }) {
 function Home({ setRoute }) {
   return (
     <div>
+      <div className="card" style={{ marginTop: 16 }}>
+        <h3>New: Ingest Circulars</h3>
+        <div className="small">
+          Use the <strong>Ingest Circular</strong> tab to upload a PDF/image or paste a link.
+        </div>
+        <button className="primary" style={{ marginTop: 8 }} onClick={() => setRoute("ingest")}>
+          Ingest a Circular
+        </button>
+      </div>
       <div className="hero">
         <div className="card">
           <h3>Find a product</h3>
