@@ -6,6 +6,7 @@ function TopBar({ route, setRoute }) {
   const items = [
     { id: "home", label: "Home" },
     { id: "compare", label: "Compare" },
+    { id: "ingest", label: "Ingest Circular" },
     { id: "receipt", label: "Receipt Upload" },
     { id: "contribute", label: "Contribute" },
     { id: "sources", label: "Sources" }
@@ -165,6 +166,112 @@ function ReceiptUpload() {
   );
 }
 
+function IngestCircular() {
+  const [stores, setStores] = useState([]);
+  const [storeId, setStoreId] = useState("");
+  const [tab, setTab] = useState("upload");
+  const [file, setFile] = useState(null);
+  const [url, setUrl] = useState("");
+  const [items, setItems] = useState([]);
+  const [ocrText, setOcrText] = useState("");
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    fetch(`${API_BASE}/stores`).then(r => r.json()).then(setStores);
+  }, []);
+
+  const runOcr = async () => {
+    if (!file || !storeId) return;
+    setStatus("Processing...");
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${API_BASE}/ocr/run`, { method: "POST", body: form });
+    const data = await res.json();
+    setItems(data.items || []);
+    setOcrText(data.text || "");
+    setStatus(`Found ${data.items?.length || 0} items`);
+  };
+
+  const saveFromText = async () => {
+    if (!ocrText || !storeId) return;
+    const payload = {
+      store_id: Number(storeId),
+      source_url: file ? `upload:${file.name}` : "upload",
+      text: ocrText
+    };
+    const res = await fetch(`${API_BASE}/ingestion/circulars/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    setStatus(`Saved ${data.count || 0} items`);
+  };
+
+  const fetchFromUrl = async () => {
+    if (!url || !storeId) return;
+    setStatus("Fetching...");
+    const payload = { store_id: Number(storeId), source_url: url };
+    const res = await fetch(`${API_BASE}/ingestion/circulars/from-url`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    setItems(data.items || []);
+    setStatus(`Saved ${data.count || 0} items`);
+  };
+
+  return (
+    <div className="section">
+      <div className="card">
+        <h3>Ingest Circular</h3>
+        <div className="filters">
+          <select value={storeId} onChange={(e) => setStoreId(e.target.value)}>
+            <option value="">Select store</option>
+            {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+
+        <div className="tabs">
+          <button className={tab === "upload" ? "active" : ""} onClick={() => setTab("upload")}>Upload File</button>
+          <button className={tab === "link" ? "active" : ""} onClick={() => setTab("link")}>Use Link</button>
+        </div>
+
+        {tab === "upload" && (
+          <div>
+            <div className="dropzone">
+              <input type="file" onChange={(e) => setFile(e.target.files[0])} />
+            </div>
+            <button className="primary" style={{ marginTop: 12 }} onClick={runOcr}>Process Circular</button>
+            <button className="primary" style={{ marginTop: 12, marginLeft: 8 }} onClick={saveFromText}>Save to Database</button>
+          </div>
+        )}
+
+        {tab === "link" && (
+          <div className="filters">
+            <input placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} />
+            <button className="primary" onClick={fetchFromUrl}>Fetch & Process</button>
+          </div>
+        )}
+
+        <div className="small" style={{ marginTop: 8 }}>{status}</div>
+
+        {items.length > 0 && (
+          <div className="card" style={{ marginTop: 12 }}>
+            <h3>Detected Items</h3>
+            <ul>
+              {items.map((it, idx) => (
+                <li key={idx}>{it.name || it.raw_text} — ${it.price}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Contribute() {
   const [stores, setStores] = useState([]);
   const [storeId, setStoreId] = useState("");
@@ -268,6 +375,7 @@ function App() {
 
   let page = <Home setRoute={setRoute} />;
   if (route === "compare") page = <Compare />;
+  if (route === "ingest") page = <IngestCircular />;
   if (route === "receipt") page = <ReceiptUpload />;
   if (route === "contribute") page = <Contribute />;
   if (route === "sources") page = <Sources />;

@@ -66,6 +66,26 @@ body {
   border-color: var(--accent);
 }
 
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tabs button {
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 8px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.tabs button.active {
+  background: var(--accent-2);
+  color: #1b1d1f;
+  border-color: var(--accent-2);
+}
+
 .hero {
   display: grid;
   grid-template-columns: 1.2fr 0.8fr;

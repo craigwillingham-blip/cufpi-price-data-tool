@@ -12,5 +12,6 @@ Base URL: `http://127.0.0.1:8000`
 - `GET /sources`
 - `PATCH /sources`
 - `POST /ingestion/circulars/run`
+- `POST /ingestion/circulars/from-url`
 - `POST /ingestion/instacart/scan`
 - `POST /ocr/run`

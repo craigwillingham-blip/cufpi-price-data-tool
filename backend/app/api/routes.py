@@ -4,12 +4,14 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from datetime import date
 from pathlib import Path
+from urllib.request import urlopen, Request
+from urllib.error import URLError
 
 from app.db import get_db
 from app.models import orm
 from app.services.crud import get_or_create_product, get_or_create_variant, create_price_observation
 from app.services.ocr_parse import parse_ocr_text
-from app.services.ingest_parse import parse_circular_text
+from app.services.ingest_parse import parse_circular_text, strip_html
 from app.services.sources import load_sources, save_sources
 from app.services.ocr import run_tesseract
 
@@ -27,6 +29,10 @@ class CircularIngest(BaseModel):
     source_url: str
     week_start: Optional[str] = None
     text: str
+
+class CircularFromUrl(BaseModel):
+    store_id: int
+    source_url: str
 
 class InstacartIngest(BaseModel):
     store_id: int
@@ -140,6 +146,58 @@ def list_sources():
 def update_sources(payload: dict):
     save_sources(payload)
     return {"status": "saved"}
+
+@router.post("/ingestion/circulars/from-url")
+def ingest_from_url(payload: CircularFromUrl, db: Session = Depends(get_db)):
+    DATA_ROOT.mkdir(parents=True, exist_ok=True)
+    circ_dir = DATA_ROOT / "circulars"
+    circ_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        req = Request(payload.source_url, headers={"User-Agent": "CUFPI/1.0"})
+        with urlopen(req) as resp:
+            content_type = resp.headers.get("Content-Type", "")
+            data = resp.read()
+    except URLError as exc:
+        return {"error": f"failed to fetch url: {exc}"}
+
+    text = ""
+    if "text/html" in content_type:
+        raw = data.decode("utf-8", errors="ignore")
+        text = strip_html(raw)
+    elif "text/plain" in content_type:
+        text = data.decode("utf-8", errors="ignore")
+    else:
+        # treat as binary file (pdf/image)
+        fname = payload.source_url.split("/")[-1] or "circular.bin"
+        dest = circ_dir / fname
+        dest.write_bytes(data)
+        try:
+            text = run_tesseract(str(dest))
+        except Exception as exc:
+            return {"error": f"ocr failed: {exc}"}
+
+    items = parse_circular_text(text)
+
+    circular = orm.Circular(
+        store_id=payload.store_id,
+        week_start=date.today(),
+        source_url=payload.source_url,
+        raw_file_path="",
+    )
+    db.add(circular)
+    db.commit()
+    db.refresh(circular)
+
+    for it in items:
+        product = get_or_create_product(db, it["name"])
+        variant = get_or_create_variant(db, product.id, brand=None, size=it.get("size"), unit=None)
+        ci = orm.CircularItem(circular_id=circular.id, raw_text=it["raw_text"], product_variant_id=variant.id, price=it["price"], size=it.get("size"))
+        db.add(ci)
+        create_price_observation(db, variant.id, payload.store_id, it["price"], "circular", payload.source_url)
+    db.commit()
+
+    return {"status": "ingested", "count": len(items), "items": items}
 
 @router.post("/ingestion/circulars/run")
 def run_ingestion(payload: CircularIngest, db: Session = Depends(get_db)):

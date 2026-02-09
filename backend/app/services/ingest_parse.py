@@ -23,3 +23,11 @@ def parse_circular_text(text: str) -> List[Dict]:
         name = name.strip(" -")
         items.append({"raw_text": line, "name": name, "size": size, "price": price})
     return items
+
+
+def strip_html(raw: str) -> str:
+    cleaned = re.sub(r"<script.*?>.*?</script>", " ", raw, flags=re.DOTALL | re.IGNORECASE)
+    cleaned = re.sub(r"<style.*?>.*?</style>", " ", cleaned, flags=re.DOTALL | re.IGNORECASE)
+    cleaned = re.sub(r"<[^>]+>", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned
