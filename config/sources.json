@@ -1,0 +1,10 @@
+﻿{
+  "sources": [
+    {
+      "id": 1,
+      "store": "Store A",
+      "url": "https://example.com/circular.pdf",
+      "enabled": true
+    }
+  ]
+}
